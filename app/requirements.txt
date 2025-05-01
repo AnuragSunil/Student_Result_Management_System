@@ -3,7 +3,6 @@
 # platform: win-64
 blinker==1.9.0
 gunicorn
-bzip2==1.0.8
 ca-certificates==2025.4.26
 chardet==5.2.0
 click==8.1.8
