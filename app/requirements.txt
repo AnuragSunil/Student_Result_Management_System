@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: win-64
-blinker=1.9.0=pyhff2d567_0
+blinker==1.9.0
 gunicorn
 bzip2=1.0.8=h2466b09_7
 ca-certificates=2025.4.26=h4c7d964_0
