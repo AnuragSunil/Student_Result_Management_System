@@ -19,6 +19,12 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
 cur = conn.cursor()
 
+@app.route('/')
+def home():
+    return jsonify({
+        "message": "🎉 Welcome to Student Management API! Use /get_students, /add_student etc."
+    })
+    
 @app.route('/add_student', methods=['POST'])
 def add_student():
     try:
