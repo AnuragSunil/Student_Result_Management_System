@@ -19,12 +19,6 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
 cur = conn.cursor()
 
-@app.route('/')
-def home():
-    return jsonify({
-        "message": "🎉 Welcome to Student Management API! Use /get_students, /add_student etc."
-    })
-    
 @app.route('/add_student', methods=['POST'])
 def add_student():
     try:
@@ -327,5 +321,4 @@ def generate_report_card(student_id):
         }), 400
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-
+    app.run(debug=True)
