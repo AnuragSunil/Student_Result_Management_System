@@ -1,26 +1,23 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import psycopg2
 import psycopg2.extras
 from flask_cors import CORS
 import csv
 from io import StringIO
-from flask import send_file
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import io
+import os  # 🔥 for env vars
 
 app = Flask(__name__)
-CORS(app)  
+CORS(app)
 
-# PostgreSQL Connection Setup
-conn = psycopg2.connect(
-    database="student_management",
-    user="postgres",  # replace with your username
-    password="a",  # replace with your password
-    host="localhost",
-    port="5432"
-)
-cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+# PostgreSQL Connection Setup (Render)
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+# Connect
+conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
+cur = conn.cursor()
 
 @app.route('/add_student', methods=['POST'])
 def add_student():
@@ -53,6 +50,7 @@ def add_student():
             "status": "error",
             "message": str(e)
         }), 400
+
 @app.route('/get_students', methods=['GET'])
 def get_students():
     try:
@@ -80,7 +78,7 @@ def get_students():
             "status": "error",
             "message": str(e)
         }), 400
-    
+
 @app.route('/add_mark', methods=['POST'])
 def add_mark():
     try:
@@ -88,16 +86,14 @@ def add_mark():
 
         student_id = int(data['student_id'])
         subject = data['subject']
-        score = int(data['score'])  # 🟢 Convert to int here
+        score = int(data['score'])
 
-        # Validate score (between 0 and 100)
         if score < 0 or score > 100:
             return jsonify({
                 "status": "error",
                 "message": "Score must be between 0 and 100"
             }), 400
 
-        # Check if student exists
         cur.execute("SELECT * FROM students WHERE student_id = %s;", (student_id,))
         student = cur.fetchone()
 
@@ -107,7 +103,6 @@ def add_mark():
                 "message": "Student ID not found"
             }), 404
 
-        # Insert mark
         cur.execute("""
             INSERT INTO marks (student_id, subject, score)
             VALUES (%s, %s, %s)
@@ -133,7 +128,6 @@ def add_mark():
 @app.route('/get_student_by_id/<int:student_id>', methods=['GET'])
 def get_student_by_id(student_id):
     try:
-        # Get student info
         cur.execute("SELECT * FROM students WHERE student_id = %s;", (student_id,))
         student = cur.fetchone()
 
@@ -143,7 +137,6 @@ def get_student_by_id(student_id):
                 "message": "Student ID not found"
             }), 404
 
-        # Get marks for the student
         cur.execute("SELECT * FROM marks WHERE student_id = %s;", (student_id,))
         marks = cur.fetchall()
 
@@ -154,7 +147,6 @@ def get_student_by_id(student_id):
                 "score": mark['score']
             })
 
-        # Return student info along with marks
         student_info = {
             "student_id": student['student_id'],
             "name": student['name'],
@@ -174,6 +166,7 @@ def get_student_by_id(student_id):
             "status": "error",
             "message": str(e)
         }), 400
+
 @app.route('/update_student/<int:student_id>', methods=['PUT'])
 def update_student(student_id):
     try:
@@ -184,7 +177,6 @@ def update_student(student_id):
         section = data.get('section')
         email = data.get('email')
 
-        # Check if student exists
         cur.execute("SELECT * FROM students WHERE student_id = %s;", (student_id,))
         student = cur.fetchone()
 
@@ -194,7 +186,6 @@ def update_student(student_id):
                 "message": "Student ID not found"
             }), 404
 
-        # Update student info
         cur.execute("""
             UPDATE students
             SET name = %s, class = %s, section = %s, email = %s
@@ -214,10 +205,10 @@ def update_student(student_id):
             "status": "error",
             "message": str(e)
         }), 400
+
 @app.route('/delete_student/<int:student_id>', methods=['DELETE'])
 def delete_student(student_id):
     try:
-        # Check if student exists
         cur.execute("SELECT * FROM students WHERE student_id = %s;", (student_id,))
         student = cur.fetchone()
 
@@ -227,10 +218,7 @@ def delete_student(student_id):
                 "message": "Student ID not found"
             }), 404
 
-        # Delete marks associated with the student
         cur.execute("DELETE FROM marks WHERE student_id = %s;", (student_id,))
-
-        # Delete student
         cur.execute("DELETE FROM students WHERE student_id = %s;", (student_id,))
 
         conn.commit()
@@ -246,10 +234,10 @@ def delete_student(student_id):
             "status": "error",
             "message": str(e)
         }), 400
+
 @app.route('/export_students_marks', methods=['GET'])
 def export_students_marks():
     try:
-        # Fetch all students
         cur.execute("SELECT * FROM students;")
         students = cur.fetchall()
 
@@ -265,7 +253,6 @@ def export_students_marks():
                 "marks": []
             }
 
-            # Get marks for the student
             cur.execute("SELECT * FROM marks WHERE student_id = %s;", (student['student_id'],))
             marks = cur.fetchall()
 
@@ -287,10 +274,10 @@ def export_students_marks():
             "status": "error",
             "message": str(e)
         }), 400
+
 @app.route('/generate_report_card/<int:student_id>', methods=['GET'])
 def generate_report_card(student_id):
     try:
-        # Fetch student data
         cur.execute("SELECT * FROM students WHERE student_id = %s;", (student_id,))
         student = cur.fetchone()
 
@@ -300,22 +287,18 @@ def generate_report_card(student_id):
                 "message": "Student ID not found"
             }), 404
 
-        # Fetch marks for the student
         cur.execute("SELECT * FROM marks WHERE student_id = %s;", (student_id,))
         marks = cur.fetchall()
 
-        # Create PDF
         pdf_buffer = io.BytesIO()
         c = canvas.Canvas(pdf_buffer, pagesize=letter)
         
         c.setFont("Helvetica", 12)
 
-        # Title
         c.drawString(200, 750, f"Report Card for {student['name']}")
         c.drawString(200, 730, f"Class: {student['class']} | Section: {student['section']}")
         c.drawString(200, 710, f"Email: {student['email']}")
 
-        # Draw subject and marks table
         y_position = 690
         c.drawString(50, y_position, "Subject")
         c.drawString(400, y_position, "Score")
@@ -326,10 +309,8 @@ def generate_report_card(student_id):
             c.drawString(400, y_position, str(mark['score']))
             y_position -= 20
 
-        # Save PDF
         c.save()
 
-        # Prepare PDF for sending to user
         pdf_buffer.seek(0)
         return send_file(pdf_buffer, as_attachment=True, download_name=f"report_card_{student['name']}.pdf", mimetype="application/pdf")
 
